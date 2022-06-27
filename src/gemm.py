@@ -7,7 +7,7 @@ import numpy as np
 # write A, B, and C to a file so it can be used by CUDA program for validation
 # Took this from @geohot: https://github.com/geohot/tinygrad/blob/gemm/extra/gemm/gemm.py
 
-N = 8192
+N = 4096
 if __name__ == "__main__":
   # N^2
   A = np.random.randn(N, N).astype(np.float32)

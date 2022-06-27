@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#define N 8192
+#define N 4096
 
 
 uint64_t nanos() {
