@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 #define N 16384
-#define TILE_WIDTH 4
+#define TILE_WIDTH 32
 
 uint64_t nanos() {
   struct timespec start;
@@ -54,8 +54,8 @@ __global__ void cuda_shared_gemm(float *A, float *B, float *C) {
     __syncthreads();
     for (int k = 0; k < TILE_WIDTH; k++) {
       result += tileM[ty][k] * tileN[k][tx];
-      __syncthreads();
     }
+	__syncthreads();
 
   }
 
@@ -108,8 +108,8 @@ int main() {
     //dim3 dimBlock(TILE_WIDTH, TILE_WIDTH, 1);
 
     uint64_t start = nanos();
-    cuda_basic_gemm<<<dimGrid, dimBlock>>>(devA, devB, devC);
-    //cuda_shared_gemm<<<dimGrid, dimBlock>>>(devA, devB, devC);
+    //cuda_basic_gemm<<<dimGrid, dimBlock>>>(devA, devB, devC);
+    cuda_shared_gemm<<<dimGrid, dimBlock>>>(devA, devB, devC);
     cudaDeviceSynchronize();
 
     // dumb CPU matmul
@@ -132,6 +132,10 @@ int main() {
     printf("%f sec\n", s);
     printf("%f GFLOP/S -- %.2f ms\n", gflop/s, s*1e3);
 
+	// free up A and B so we can have enough space for the result
+	free(A);
+	free(B);
+	
     cudaMemcpy(C, devC, N * N * sizeof(float), cudaMemcpyDeviceToHost);
     for (int k = 0; k < N*N; k++) {
         if (fabsf(C[k] - val[k]) > 1e-3) {
@@ -146,8 +150,6 @@ int main() {
     cudaFree(devB);
     cudaFree(devC);
 
-    free(A);
-    free(B);
     free(C);
     free(val);
     return 0;
