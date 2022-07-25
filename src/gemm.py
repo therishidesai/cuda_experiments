@@ -7,7 +7,7 @@ import numpy as np
 # write A, B, and C to a file so it can be used by CUDA program for validation
 # Took this from @geohot: https://github.com/geohot/tinygrad/blob/gemm/extra/gemm/gemm.py
 
-N = 4096
+N = 16384
 if __name__ == "__main__":
   # N^2
   A = np.random.randn(N, N).astype(np.float32)
@@ -25,7 +25,8 @@ if __name__ == "__main__":
     s = et-st
     print(f"{flop/s * 1e-9:.2f} GFLOP/S, {s*1e3:.2f} ms")
 
-  with open("/tmp/matmul", "wb") as f:
+  with open("/home/rishi/matmul", "wb") as f:
+    print("write to file")
     f.write(A.data)
     f.write(B.data)
     f.write(C.astype(np.float32).data)

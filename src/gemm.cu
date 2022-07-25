@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#define N 4096
-
+#define N 16384
+#define TILE_WIDTH 4
 
 uint64_t nanos() {
   struct timespec start;
@@ -31,6 +31,37 @@ __global__ void cuda_basic_gemm(float* Ad, float* Bd, float* Cd){
 	Cd[row * N + col] = dp;
 }
 
+// Tiled Cd = Ad * Bd
+__global__ void cuda_shared_gemm(float *A, float *B, float *C) {
+
+  __shared__ float tileM[TILE_WIDTH][TILE_WIDTH];
+  __shared__ float tileN[TILE_WIDTH][TILE_WIDTH];
+
+  int bx = blockIdx.x;
+  int by = blockIdx.y;
+
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+
+  int row = by * TILE_WIDTH + ty;
+  int col = bx * TILE_WIDTH + tx;
+
+  float result = 0;
+  for(int t = 0; t < N/TILE_WIDTH; t++) {
+    tileM[ty][tx] = A[row * N + t * TILE_WIDTH + tx];
+    tileN[ty][tx] = B[(t * TILE_WIDTH + ty) * N + col];
+
+    __syncthreads();
+    for (int k = 0; k < TILE_WIDTH; k++) {
+      result += tileM[ty][k] * tileN[k][tx];
+      __syncthreads();
+    }
+
+  }
+
+  C[row * N + col] = result;
+}
+
 int main() {
     float* devA;
     float* devB;
@@ -46,9 +77,10 @@ int main() {
 	C = (float*) malloc(N * N * sizeof(float));
 	val = (float*) malloc(N * N * sizeof(float));
 
+	printf("Reading file\n");
     // Read matmul from numpy for validation
     // Took this from @geohot: https://github.com/geohot/tinygrad/blob/gemm/extra/gemm/gemm.c#L115
-    FILE *f = fopen("/tmp/matmul", "rb");
+    FILE *f = fopen("/home/rishi/matmul", "rb");
     if (f == NULL) {
         printf("please pregenerate python /tmp/matmul file\n");
         return -1;
@@ -58,6 +90,7 @@ int main() {
     fread(val, 1, sizeof(float)*N*N, f);
     fclose(f);
 
+	printf("CUDA!!!\n");
 
     cudaMalloc((void**) &devA, N * N * sizeof(float));
     cudaMalloc((void**) &devB, N * N * sizeof(float));
@@ -71,9 +104,12 @@ int main() {
 	// Create a grid of 32x32 thread blocks
 	dim3 dimGrid(ceil(N/32.0), ceil(N/32.0), 1);
 	dim3 dimBlock(32, 32, 1);
+	//dim3 dimGrid(ceil(N/double(TILE_WIDTH)), ceil(N/double(TILE_WIDTH)), 1);
+	//dim3 dimBlock(TILE_WIDTH, TILE_WIDTH, 1);
 
 	uint64_t start = nanos();
     cuda_basic_gemm<<<dimGrid, dimBlock>>>(devA, devB, devC);
+	//cuda_shared_gemm<<<dimGrid, dimBlock>>>(devA, devB, devC);
     cudaDeviceSynchronize();
 
 	// dumb CPU matmul
@@ -90,8 +126,10 @@ int main() {
     uint64_t end = nanos();
 
 	printf("GPU\n");
-	double gflop = (2.0*N*N*N)*1e-9;
-	double s = (end-start)*1e-9;
+	double gflop = (2.0*N*N*N)*(1e-9);
+	double s = (end-start)*(1e-9);
+	printf("%f GFLOP\n", gflop);
+	printf("%f sec\n", s);
 	printf("%f GFLOP/S -- %.2f ms\n", gflop/s, s*1e3);
 
 	cudaMemcpy(C, devC, N * N * sizeof(float), cudaMemcpyDeviceToHost);
