@@ -102,10 +102,8 @@ int main() {
 
     // Thread block size of 32x32
     // Create a grid of 32x32 thread blocks
-    dim3 dimGrid(ceil(N/32.0), ceil(N/32.0), 1);
-    dim3 dimBlock(32, 32, 1);
-    //dim3 dimGrid(ceil(N/double(TILE_WIDTH)), ceil(N/double(TILE_WIDTH)), 1);
-    //dim3 dimBlock(TILE_WIDTH, TILE_WIDTH, 1);
+    dim3 dimGrid(ceil(N/double(TILE_WIDTH)), ceil(N/double(TILE_WIDTH)), 1);
+    dim3 dimBlock(TILE_WIDTH, TILE_WIDTH, 1);
 
     uint64_t start = nanos();
     //cuda_basic_gemm<<<dimGrid, dimBlock>>>(devA, devB, devC);
